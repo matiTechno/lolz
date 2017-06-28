@@ -1,3 +1,9 @@
-im finally developing tcp chat system with opengl rendering (glfw window)
+im developing tcp chat system with opengl rendering (glfw window)
 and asio network library.
 maybe i should do something better or diffrent to move further but...
+
+also one new thing is that I have one opengl thread and one input thread so
+typing feels good and gpu can sleep.
+
+and I'm embedding fonts and images into binary which seems to be nice for such project.
+no messing with paths on apple mac.
