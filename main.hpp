@@ -40,26 +40,34 @@ struct Batch
 {
     int first;
     int numInstances;
-    GLuint texId;
     ivec2 texSize;
-    bool isFont;
     vec2 projStart;
     vec2 projRange;
+    bool isFont;     // default: false
+    GLuint texId;    // default: 0
 };
 
 class Main
 {
 public:
+    Main();
+    // set proper batch states before using these functions
     void addText(const std::string& string, vec2 pos, const vec4& color);
     void addInstance(vec2 pos, vec2 size, const vec4& color, const ivec4& texCoords);
+    // border is inside specified rect
+    void addBorder(vec2 pos, vec2 size, const vec4& color, float width);
     // if id == 0 texture sampling will not be used
     void setTexture(GLuint id, ivec2 size = ivec2());
-    void isFont(bool is);
+    void setFont(bool on);
     void setProjection(vec2 start, vec2 range);
 
-    Main();
-    static Main* main;
+private:
     Deleter delGlfw;
+    std::unique_ptr<Texture> gnuTex;
+    ivec2 gnuTexSize;
+
+public:
+    static Main* main;
     GLFWwindow* window;
     Instance instances[maxInstances];
     std::vector<Batch> batches;
@@ -67,8 +75,6 @@ public:
     float frametime;
     std::mutex mutex;
     std::unique_ptr<Font> font;
-    std::unique_ptr<Texture> gnuTex;
-    ivec2 gnuTexSize;
 
 private:
     void run();
@@ -76,8 +82,9 @@ private:
     static void keyCallback(GLFWwindow*, int key, int scancode, int action, int mods);
     static void characterCallback(GLFWwindow*, unsigned int codepoint);
     static void runRenderThread();
-    std::string testStr;
     void addBatch();
+
+    std::string testStr;
 };
 
 // Font::texSize[0] must be specified

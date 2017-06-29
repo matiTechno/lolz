@@ -1,4 +1,5 @@
 #pragma once
+#include <glm/vec4.hpp>
 
 struct ivec2;
 struct vec2

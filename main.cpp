@@ -112,7 +112,7 @@ void Main::run()
                 setProjection({0.f, 0.f}, fbSize);
 
                 setTexture(gnuTex->id, ivec2(gnuTexSize));
-                isFont(false);
+                setFont(false);
                 vec4 texCoords(0.f, 0.f, gnuTexSize.x, gnuTexSize.y);
                 float fbAspect = float(fbSize.x) / fbSize.y;
                 float texAspect = float(gnuTexSize.x) / gnuTexSize.y;
@@ -128,11 +128,15 @@ void Main::run()
                 }
                 addInstance(vec2(0.f), fbSize, {1.f, 1.f, 1.f, 0.15f}, texCoords);
 
+                setTexture(font->texture.id, font->texSize);
+                setFont(true);
                 vec2 pos(font->advance, font->newlineSpace);
-                vec4 color(0.7f, 0.7f, 0.7f, 1.f);
-                addText(testStr.c_str(), pos, color);
-            }
+                addText(testStr.c_str(), pos, {0.7f, 0.7f, 0.7f, 1.f});
 
+                setTexture(0);
+                setFont(false);
+                addBorder(vec2(50), vec2(fbSize.x - 100.f, fbSize.y - 100.f), {1.f, 0.5f, 0.f, 1.f}, 1.f);
+            }
         } // unlock
     }
     future.get();
@@ -159,11 +163,11 @@ void Main::runRenderThread()
 
 void Main::addBatch()
 {
-    const auto& prev = batches.back();
+    const auto& batch = batches.back();
     batches.emplace_back();
     auto& newBatch = batches.back();
-    newBatch = prev;
-    newBatch.first = prev.first + prev.numInstances;
+    newBatch = batch;
+    newBatch.first = batch.first + batch.numInstances;
     newBatch.numInstances = 0;
 }
 
@@ -179,10 +183,19 @@ void Main::addInstance(vec2 pos, vec2 size, const vec4& color, const ivec4& texC
     instance.texCoords = texCoords;
 }
 
+void Main::addBorder(vec2 pos, vec2 size, const vec4& color, float width)
+{
+    vec4 dum{};
+    addInstance(pos, vec2(size.x, width), color, dum);
+    addInstance(vec2(pos.x, pos.y + size.y - width), vec2(size.x, width), color, dum);
+    addInstance(vec2(pos.x, pos.y + width), vec2(width, size.y - 2.f * width), color, dum);
+    addInstance(vec2(pos.x + size.x - width, pos.y + width), vec2(width, size.y - 2.f * width), color, dum);
+}
+
 void Main::setTexture(GLuint id, ivec2 size)
 {
     auto& batch = batches.back();
-    if(batch.numInstances && (batch.texId != id || batch.texSize != size))
+    if(batch.numInstances && batch.texId != id)
         addBatch();
 
     auto& newBatch = batches.back();
@@ -190,13 +203,12 @@ void Main::setTexture(GLuint id, ivec2 size)
     newBatch.texSize = size;
 }
 
-void Main::isFont(bool is)
+void Main::setFont(bool on)
 {
     const auto& batch = batches.back();
-    if(batch.numInstances && batch.isFont != is)
+    if(batch.numInstances && batch.isFont != on)
         addBatch();
-
-    batches.back().isFont = is;
+    batches.back().isFont = on;
 }
 
 void Main::setProjection(vec2 start, vec2 range)
@@ -244,13 +256,11 @@ static const char* vertexSource =
         "layout(location = 4) in ivec4 texCoords;"
         "uniform vec2 projStart;"
         "uniform vec2 projRange;"
-        "uniform int useTexture;"
         "uniform ivec2 texSize;"
         "out vec2 vTexCoord;"
         "out vec4 vColor;"
         "void main()"
         "{"
-        "if(useTexture == 1)"
         "vTexCoord = vertex * texCoords.zw / vec2(texSize) + texCoords.xy / vec2(texSize);"
         "vColor = color;"
         "gl_Position = vec4("
@@ -351,9 +361,6 @@ void Renderer::run()
 
 void Main::addText(const std::string& string, vec2 pos, const vec4& color)
 {
-    setTexture(font->texture.id, font->texSize);
-    isFont(true);
-
     int x = pos.x, y = pos.y;
     for(auto c: string)
     {
