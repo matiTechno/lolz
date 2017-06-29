@@ -9,6 +9,12 @@
 #include "gnu.h"
 
 Main* Main::main;
+GLFWwindow* Main::window;
+std::mutex Main::mutex;
+Main::Instance Main::instances[maxInstances];
+std::vector<Main::Batch> Main::batches;
+glm::ivec2 Main::fbSize;
+float Main::frametime;
 
 int main()
 {
@@ -44,8 +50,8 @@ Main::Main()
 
     batches.reserve(10);
 
-    glfwSetCharCallback(window, characterCallback);
-    glfwSetKeyCallback(window, keyCallback);
+    glfwSetCharCallback(window, Client::characterCallback);
+    glfwSetKeyCallback(window, Client::keyCallback);
 
     glfwMakeContextCurrent(window);
     gladLoadGLLoader(GLADloadproc(glfwGetProcAddress));
@@ -78,10 +84,6 @@ Main::Main()
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, gnuTexSize.x, gnuTexSize.y, GL_RGBA, GL_UNSIGNED_BYTE, data);
     stbi_image_free(data);
 
-    testStr = "Hi!\n"
-              "I'm matiTechno. C++ developer.\n"
-              "test test test\n"
-              "Hello!";
     run();
 }
 
@@ -110,9 +112,8 @@ void Main::run()
             glfwGetFramebufferSize(window, &fbSize.x, &fbSize.y);
             {
                 setProjection({0.f, 0.f}, fbSize);
-
                 setTexture(gnuTex->id, gnuTexSize);
-                setFont(false);
+
                 glm::vec4 texCoords(0.f, 0.f, gnuTexSize);
                 float fbAspect = float(fbSize.x) / fbSize.y;
                 float texAspect = float(gnuTexSize.x) / gnuTexSize.y;
@@ -127,14 +128,7 @@ void Main::run()
                     texCoords.x = (gnuTexSize.x - texCoords.z) / 2;
                 }
                 addInstance(glm::vec2(0.f), fbSize, {1.f, 1.f, 1.f, 0.15f}, texCoords);
-
-                setTexture(font->texture.id, font->texSize);
-                setFont(true);
-                addText(testStr.c_str(), glm::vec2(font->advance, font->newlineSpace), {0.7f, 0.7f, 0.7f, 1.f});
-
-                setTexture(0);
-                setFont(false);
-                addBorder(glm::vec2(50.f), glm::vec2(fbSize - 100), {1.f, 0.5f, 0.f, 1.f}, 1.f);
+                client.render();
             }
         } // unlock
     }
@@ -144,7 +138,7 @@ void Main::run()
 
 void Main::runRenderThread()
 {
-    glfwMakeContextCurrent(Main::main->window);
+    glfwMakeContextCurrent(window);
     {
         try
         {
@@ -154,7 +148,7 @@ void Main::runRenderThread()
         catch(const std::exception& e)
         {
             printf("%s\n", e.what());
-            glfwSetWindowShouldClose(Main::main->window, 1);
+            glfwSetWindowShouldClose(window, 1);
         }
     }
     glfwMakeContextCurrent(0);
@@ -200,14 +194,20 @@ void Main::setTexture(GLuint id, glm::ivec2 size)
     auto& newBatch = batches.back();
     newBatch.texId = id;
     newBatch.texSize = size;
+    newBatch.isFont = false;
 }
 
-void Main::setFont(bool on)
+void Main::setFontMode()
 {
     const auto& batch = batches.back();
-    if(batch.numInstances && batch.isFont != on)
+    const auto& font = *main->font;
+    if(batch.numInstances && batch.isFont == false)
         addBatch();
-    batches.back().isFont = on;
+
+    auto& newBatch = batches.back();
+    newBatch.isFont = true;
+    newBatch.texId = font.texture.id;
+    newBatch.texSize = font.texSize;
 }
 
 void Main::setProjection(glm::vec2 start, glm::vec2 range)
@@ -225,25 +225,6 @@ void Main::errorCallback(int error, const char* description)
 {
     (void)error;
     printf("Error: %s\n", description);
-}
-
-void Main::keyCallback(GLFWwindow*, int key, int scancode, int action, int mods)
-{
-    (void)scancode;
-    (void)mods;
-    if(action == GLFW_RELEASE)
-        return;
-    auto& str = Main::main->testStr;
-    switch(key)
-    {
-    case GLFW_KEY_ENTER: str.push_back('\n'); break;
-    case GLFW_KEY_BACKSPACE: if(str.size()) str.erase(str.size() - 1, 1); break;
-    }
-}
-
-void Main::characterCallback(GLFWwindow*, unsigned int codepoint)
-{
-    Main::main->testStr.push_back(codepoint);
 }
 
 static const char* vertexSource =
@@ -286,14 +267,14 @@ static const char* fragmentSource =
         "color = vColor;"
         "}";
 
-Renderer::Renderer():
+Main::Renderer::Renderer():
     shader(vertexSource, fragmentSource, "Renderer")
 {
     shader.bind();
 
     float rect[] = {0.f, 0.f, 1.f, 0.f, 1.f, 1.f, 1.f, 1.f, 0.f, 1.f, 0.f, 0.f};
 
-    glBindBuffer(GL_ARRAY_BUFFER, vboRect.id);
+    glBindBuffer(GL_ARRAY_BUFFER, vboVert.id);
     glBufferData(GL_ARRAY_BUFFER, sizeof(rect), rect, GL_STATIC_DRAW);
 
     glBindVertexArray(vao.id);
@@ -318,20 +299,20 @@ Renderer::Renderer():
     run();
 }
 
-void Renderer::run()
+void Main::Renderer::run()
 {
-    while(!glfwWindowShouldClose(Main::main->window))
+    while(!glfwWindowShouldClose(window))
     {
         glClear(GL_COLOR_BUFFER_BIT);
         {
-            std::unique_lock<std::mutex> lock(Main::main->mutex);
+            std::unique_lock<std::mutex> lock(mutex);
             (void)lock;
-            glViewport(0, 0, Main::main->fbSize.x, Main::main->fbSize.y);
+            glViewport(0, 0, fbSize.x, fbSize.y);
 
-            for(auto& batch: Main::main->batches)
+            for(auto& batch: batches)
             {
                 glBufferData(GL_ARRAY_BUFFER, sizeof(Instance) * batch.numInstances,
-                             Main::main->instances + batch.first, GL_STREAM_DRAW);
+                             instances + batch.first, GL_STREAM_DRAW);
 
                 if(batch.texId)
                 {
@@ -353,27 +334,28 @@ void Renderer::run()
                 glDrawArraysInstanced(GL_TRIANGLES, 0, 6, batch.numInstances);
             }
         } // unlock
-        Main::main->mutex.unlock();
-        glfwSwapBuffers(Main::main->window);
+        mutex.unlock();
+        glfwSwapBuffers(window);
     }
 }
 
 void Main::addText(const std::string& string, glm::vec2 pos, const glm::vec4& color)
 {
+    const auto& font = *main->font;
     auto penPos = pos;
     for(auto c: string)
     {
         if(c == '\n')
         {
             penPos.x = pos.x;
-            penPos.y += font->newlineSpace;
+            penPos.y += font.metrics.newlineSpace;
             continue;
         }
         if(c < 32 || c > 126)
             c = '?';
-        const auto& glyph = font->glyphs[int(c)];
+        const auto& glyph = font.glyphs[int(c)];
         addInstance(penPos + glm::vec2(glyph.offset), {glyph.texCoords.z, glyph.texCoords.w}, color, glyph.texCoords);
-        penPos.x += font->advance;
+        penPos.x += font.metrics.advance;
     }
 }
 
@@ -389,12 +371,12 @@ void loadFont(unsigned char* ttfBuffer, int pxSize, Font* font)
     int ascent, descent, lineGap;
     stbtt_GetFontVMetrics(&fontInfo, &ascent, &descent, &lineGap);
     float scale = stbtt_ScaleForMappingEmToPixels(&fontInfo, pxSize);
-    font->ascent = scale * ascent;
-    font->descent = scale * descent;
-    font->newlineSpace = scale * (ascent - descent + lineGap);
+    font->metrics.ascent = scale * ascent;
+    font->metrics.descent = scale * descent;
+    font->metrics.newlineSpace = scale * (ascent - descent + lineGap);
     int advance, dum;
     stbtt_GetCodepointHMetrics(&fontInfo, 32, &advance, &dum);
-    font->advance = scale * advance;
+    font->metrics.advance = scale * advance;
     
     unsigned char* bitmaps[127];
     int x = 0, y = 0, maxHeight = 0;

@@ -19,6 +19,8 @@ set(SOURCE
     deleter.hpp
     gnu.h
     stb_image.c
+    client.cpp
+    client.hpp
     )
 
 add_executable(lolz ${SOURCE})
