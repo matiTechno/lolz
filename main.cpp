@@ -128,7 +128,7 @@ void Main::run()
                 }
                 addInstance(vec2(0.f), fbSize, {1.f, 1.f, 1.f, 0.15f}, texCoords);
 
-                vec2 pos(font->glyphs[int(' ')].advance, font->newlineSpace);
+                vec2 pos(font->advance, font->newlineSpace);
                 vec4 color(0.7f, 0.7f, 0.7f, 1.f);
                 addText(testStr.c_str(), pos, color);
             }
@@ -366,9 +366,9 @@ void Main::addText(const std::string& string, vec2 pos, const vec4& color)
         if(c < 32 || c > 126)
             c = '?';
         const auto& glyph = font->glyphs[int(c)];
-        addInstance(vec2(x + glyph.bearing.x, y + glyph.bearing.y), vec2(glyph.texCoords.z, glyph.texCoords.w),
+        addInstance(vec2(x + glyph.offset.x, y + glyph.offset.y), vec2(glyph.texCoords.z, glyph.texCoords.w),
                     color, glyph.texCoords);
-        x += glyph.advance;
+        x += font->advance;
     }
 }
 
@@ -387,6 +387,9 @@ void loadFont(unsigned char* ttfBuffer, int pxSize, Font* font)
     font->ascent = scale * ascent;
     font->descent = scale * descent;
     font->newlineSpace = scale * (ascent - descent + lineGap);
+    int advance, dum;
+    stbtt_GetCodepointHMetrics(&fontInfo, 32, &advance, &dum);
+    font->advance = scale * advance;
     
     unsigned char* bitmaps[127];
     int x = 0, y = 0, maxHeight = 0;
@@ -394,12 +397,11 @@ void loadFont(unsigned char* ttfBuffer, int pxSize, Font* font)
     {
         int id = stbtt_FindGlyphIndex(&fontInfo, i);
         Font::Glyph& glyph = font->glyphs[i];
-        int advance, dum;
-        stbtt_GetGlyphHMetrics(&fontInfo, id, &advance, &dum);
-        glyph.advance = scale * advance;
+        int dum1, dum2;
+        stbtt_GetGlyphHMetrics(&fontInfo, id, &dum1, &dum2);
 
         bitmaps[i] = stbtt_GetGlyphBitmap(&fontInfo, scale, scale, id, &glyph.texCoords.z, &glyph.texCoords.w,
-                                          &glyph.bearing.x, &glyph.bearing.y);
+                                          &glyph.offset.x, &glyph.offset.y);
 
         if(x + glyph.texCoords.z > font->texSize.x)
         {
