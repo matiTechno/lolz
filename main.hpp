@@ -8,7 +8,9 @@
 #include "globjects.hpp"
 #include <memory>
 #include <vector>
-#include "vec.hpp"
+#define GLM_FORCE_NO_CTOR_INIT
+#include <glm/vec2.hpp>
+#include <glm/vec4.hpp>
 
 // works for monospaced fonts
 // (advance is the same for all glyphs)
@@ -16,33 +18,33 @@ struct Font
 {
     struct Glyph
     {
-        ivec2 offset;
-        ivec4 texCoords;
+        glm::ivec2 offset;
+        glm::ivec4 texCoords;
     } glyphs[127];
 
     int newlineSpace;
     int ascent;
     int descent;
     Texture texture;
-    ivec2 texSize;
+    glm::ivec2 texSize;
     int advance;
 };
 
 struct Instance
 {
-    vec2 pos;
-    vec2 size;
-    vec4 color;
-    ivec4 texCoords;
+    glm::vec2 pos;
+    glm::vec2 size;
+    glm::vec4 color;
+    glm::ivec4 texCoords;
 };
 
 struct Batch
 {
     int first;
     int numInstances;
-    ivec2 texSize;
-    vec2 projStart;
-    vec2 projRange;
+    glm::ivec2 texSize;
+    glm::vec2 projStart;
+    glm::vec2 projRange;
     bool isFont;     // default: false
     GLuint texId;    // default: 0
 };
@@ -52,29 +54,35 @@ class Main
 public:
     Main();
     // set proper batch states before using these functions
-    void addText(const std::string& string, vec2 pos, const vec4& color);
-    void addInstance(vec2 pos, vec2 size, const vec4& color, const ivec4& texCoords);
+    // ***
+    void addText(const std::string& string, glm::vec2 pos, const glm::vec4& color);
+    void addInstance(glm::vec2 pos, glm::vec2 size, const glm::vec4& color, const glm::ivec4& texCoords);
+    // ***
     // border is inside specified rect
-    void addBorder(vec2 pos, vec2 size, const vec4& color, float width);
+    void addBorder(glm::vec2 pos, glm::vec2 size, const glm::vec4& color, float width);
+
     // if id == 0 texture sampling will not be used
-    void setTexture(GLuint id, ivec2 size = ivec2());
+    void setTexture(GLuint id, glm::ivec2 size = glm::ivec2());
+
+    // implicitly calls setTexture with Font::texture
     void setFont(bool on);
-    void setProjection(vec2 start, vec2 range);
+
+    void setProjection(glm::vec2 start, glm::vec2 range);
 
 private:
     Deleter delGlfw;
+    std::unique_ptr<Font> font;
     std::unique_ptr<Texture> gnuTex;
-    ivec2 gnuTexSize;
+    glm::ivec2 gnuTexSize;
 
 public:
     static Main* main;
     GLFWwindow* window;
     Instance instances[maxInstances];
     std::vector<Batch> batches;
-    ivec2 fbSize;
+    glm::ivec2 fbSize;
     float frametime;
     std::mutex mutex;
-    std::unique_ptr<Font> font;
 
 private:
     void run();

@@ -4,9 +4,9 @@
 #include <assert.h>
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
+#include "stb_image.h"
 #include "Inconsolata-Regular.h"
 #include "gnu.h"
-#include "stb_image.h"
 
 Main* Main::main;
 
@@ -111,9 +111,9 @@ void Main::run()
             {
                 setProjection({0.f, 0.f}, fbSize);
 
-                setTexture(gnuTex->id, ivec2(gnuTexSize));
+                setTexture(gnuTex->id, gnuTexSize);
                 setFont(false);
-                vec4 texCoords(0.f, 0.f, gnuTexSize.x, gnuTexSize.y);
+                glm::vec4 texCoords(0.f, 0.f, gnuTexSize);
                 float fbAspect = float(fbSize.x) / fbSize.y;
                 float texAspect = float(gnuTexSize.x) / gnuTexSize.y;
                 if(fbAspect > texAspect)
@@ -126,16 +126,15 @@ void Main::run()
                     texCoords.z = gnuTexSize.y * fbAspect;
                     texCoords.x = (gnuTexSize.x - texCoords.z) / 2;
                 }
-                addInstance(vec2(0.f), fbSize, {1.f, 1.f, 1.f, 0.15f}, texCoords);
+                addInstance(glm::vec2(0.f), fbSize, {1.f, 1.f, 1.f, 0.15f}, texCoords);
 
                 setTexture(font->texture.id, font->texSize);
                 setFont(true);
-                vec2 pos(font->advance, font->newlineSpace);
-                addText(testStr.c_str(), pos, {0.7f, 0.7f, 0.7f, 1.f});
+                addText(testStr.c_str(), glm::vec2(font->advance, font->newlineSpace), {0.7f, 0.7f, 0.7f, 1.f});
 
                 setTexture(0);
                 setFont(false);
-                addBorder(vec2(50), vec2(fbSize.x - 100.f, fbSize.y - 100.f), {1.f, 0.5f, 0.f, 1.f}, 1.f);
+                addBorder(glm::vec2(50.f), glm::vec2(fbSize - 100), {1.f, 0.5f, 0.f, 1.f}, 1.f);
             }
         } // unlock
     }
@@ -171,7 +170,7 @@ void Main::addBatch()
     newBatch.numInstances = 0;
 }
 
-void Main::addInstance(vec2 pos, vec2 size, const vec4& color, const ivec4& texCoords)
+void Main::addInstance(glm::vec2 pos, glm::vec2 size, const glm::vec4& color, const glm::ivec4& texCoords)
 {
     auto& batch = batches.back();
     batch.numInstances += 1;
@@ -183,16 +182,16 @@ void Main::addInstance(vec2 pos, vec2 size, const vec4& color, const ivec4& texC
     instance.texCoords = texCoords;
 }
 
-void Main::addBorder(vec2 pos, vec2 size, const vec4& color, float width)
+void Main::addBorder(glm::vec2 pos, glm::vec2 size, const glm::vec4& color, float width)
 {
-    vec4 dum{};
-    addInstance(pos, vec2(size.x, width), color, dum);
-    addInstance(vec2(pos.x, pos.y + size.y - width), vec2(size.x, width), color, dum);
-    addInstance(vec2(pos.x, pos.y + width), vec2(width, size.y - 2.f * width), color, dum);
-    addInstance(vec2(pos.x + size.x - width, pos.y + width), vec2(width, size.y - 2.f * width), color, dum);
+    glm::vec4 dum;
+    addInstance(pos, {size.x, width}, color, dum);
+    addInstance({pos.x, pos.y + size.y - width}, {size.x, width}, color, dum);
+    addInstance({pos.x, pos.y + width}, {width, size.y - 2.f * width}, color, dum);
+    addInstance({pos.x + size.x - width, pos.y + width}, {width, size.y - 2.f * width}, color, dum);
 }
 
-void Main::setTexture(GLuint id, ivec2 size)
+void Main::setTexture(GLuint id, glm::ivec2 size)
 {
     auto& batch = batches.back();
     if(batch.numInstances && batch.texId != id)
@@ -211,7 +210,7 @@ void Main::setFont(bool on)
     batches.back().isFont = on;
 }
 
-void Main::setProjection(vec2 start, vec2 range)
+void Main::setProjection(glm::vec2 start, glm::vec2 range)
 {
     const auto& batch = batches.back();
     if(batch.numInstances && (batch.projStart != start || batch.projRange != range))
@@ -359,23 +358,22 @@ void Renderer::run()
     }
 }
 
-void Main::addText(const std::string& string, vec2 pos, const vec4& color)
+void Main::addText(const std::string& string, glm::vec2 pos, const glm::vec4& color)
 {
-    int x = pos.x, y = pos.y;
+    auto penPos = pos;
     for(auto c: string)
     {
         if(c == '\n')
         {
-            x = pos.x;
-            y += font->newlineSpace;
+            penPos.x = pos.x;
+            penPos.y += font->newlineSpace;
             continue;
         }
         if(c < 32 || c > 126)
             c = '?';
         const auto& glyph = font->glyphs[int(c)];
-        addInstance(vec2(x + glyph.offset.x, y + glyph.offset.y), vec2(glyph.texCoords.z, glyph.texCoords.w),
-                    color, glyph.texCoords);
-        x += font->advance;
+        addInstance(penPos + glm::vec2(glyph.offset), {glyph.texCoords.z, glyph.texCoords.w}, color, glyph.texCoords);
+        penPos.x += font->advance;
     }
 }
 

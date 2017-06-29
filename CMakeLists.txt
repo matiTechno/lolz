@@ -17,7 +17,6 @@ set(SOURCE
     stb_image.h
     globjects.cpp
     deleter.hpp
-    vec.hpp
     gnu.h
     stb_image.c
     )
