@@ -56,8 +56,6 @@ public:
 
     static void setFontMode();
 
-    static void setProjection(glm::vec2 start, glm::vec2 range);
-
     static glm::ivec2 getFbSize() {return fbSize;}
 
     static float getFrametime() {return frametime;}
@@ -101,6 +99,7 @@ private:
     Client client;
 
     void run();
+    void setProjection(glm::vec2 start, glm::vec2 range);
     static void addBatch();
     static void errorCallback(int error, const char* description);
     static void runRenderThread();
