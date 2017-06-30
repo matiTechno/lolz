@@ -64,6 +64,9 @@ public:
 
     static Font::Metrics getFontMetrics() {return main->font->metrics;}
 
+    // pos can't be greater than string.size()
+    static glm::vec2 getPosOffset(const std::string& string, int pos);
+
 private:
     struct Instance
     {
@@ -101,6 +104,10 @@ private:
     static void addBatch();
     static void errorCallback(int error, const char* description);
     static void runRenderThread();
+    static void keyCallback(GLFWwindow* win, int key, int scancode, int action, int mods)
+    {main->client.keyCallback(win, key, scancode, action, mods);}
+    static void characterCallback(GLFWwindow* win, unsigned int codepoint)
+    {main->client.characterCallback(win, codepoint);}
 
     class Renderer
     {

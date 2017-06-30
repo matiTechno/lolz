@@ -50,8 +50,8 @@ Main::Main()
 
     batches.reserve(10);
 
-    glfwSetCharCallback(window, Client::characterCallback);
-    glfwSetKeyCallback(window, Client::keyCallback);
+    glfwSetCharCallback(window, characterCallback);
+    glfwSetKeyCallback(window, keyCallback);
 
     glfwMakeContextCurrent(window);
     gladLoadGLLoader(GLADloadproc(glfwGetProcAddress));
@@ -225,6 +225,23 @@ void Main::errorCallback(int error, const char* description)
 {
     (void)error;
     printf("Error: %s\n", description);
+}
+
+glm::vec2 Main::getPosOffset(const std::string& string, int pos)
+{
+    const auto& font = *main->font;
+    glm::vec2 offset(0.f);
+    for(int i = 0; i < pos; ++i)
+    {
+        if(string[i] == '\n')
+        {
+            offset.x = 0;
+            offset.y += font.metrics.newlineSpace;
+            continue;
+        }
+        offset.x += font.metrics.advance;
+    }
+    return offset;
 }
 
 static const char* vertexSource =

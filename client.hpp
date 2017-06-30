@@ -8,10 +8,11 @@ class Client
 public:
     Client();
     void render();
-    static void keyCallback(GLFWwindow*, int key, int scancode, int action, int mods);
-    static void characterCallback(GLFWwindow*, unsigned int codepoint);
+    void keyCallback(GLFWwindow*, int key, int scancode, int action, int mods);
+    void characterCallback(GLFWwindow*, unsigned int codepoint);
 
 private:
-    static Client* ths;
     std::string string;
+    float accumulator = 0.f;
+    bool visible = true;
 };
